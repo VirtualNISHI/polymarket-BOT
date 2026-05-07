@@ -1,0 +1,105 @@
+watchlist_builder:
+  scan_categories:
+    - Crypto
+    - Politics
+    - Macro
+  markets_per_category: 10
+  leaderboard_top_n: 50
+  # Drop hard thresholds — let the scoring function rank the top 50 instead.
+  # /holders ranks by share count, not USD, so most candidates have small
+  # cashPnl; pre-filtering by USD over-prunes. Score (pnl × 0.4 + win_rate ×
+  # 1M × 0.3 + markets × 100K × 0.3) handles the ranking.
+  min_market_appearances: 1
+  min_cumulative_pnl_usd: 0
+  watchlist_size: 50
+  # Plan C: only scan currently-active markets. Closed-market /holders returns
+  # the unredeemed long tail, which is not the smart-money cohort we want.
+  include_closed_markets: false
+  scoring:
+    pnl_weight: 0.4
+    win_rate_weight: 0.3
+    market_count_weight: 0.3
+
+tracker:
+  poll_interval_minutes: 60
+  min_notify_usd: 10000
+  always_notify_top_rank: 10
+  consolidation_window_minutes: 60
+
+convergence:
+  lookback_hours: 24
+  min_wallet_count: 3
+  min_total_amount_usd: 50000
+  enable_here_mention: true
+
+refresh_pnl:
+  schedule: weekly
+  rebuild_threshold_score_drop: 0.3
+
+daily_snapshot:
+  fetch_limit: 200
+  min_volume_24h_usd: 50000
+  movers_count: 3
+  crypto_count: 3
+  macro_count: 3
+  politics_count: 0
+  label_max_chars: 40
+  discord_color: 0x9b59b6
+  enable_discord: true
+  enable_x: true
+
+  # Render a 1200x720 PNG card and attach to Discord/X (text replaced with
+  # minimal caption). Set false to fall back to embed/tweet text.
+  image_mode: true
+
+  # Auto-translate market questions to short Japanese labels via Claude.
+  # Cached in market_jp_label table, so each unique market is translated once.
+  # Manual display_aliases below always win over LLM output.
+  enable_jp_translation: true
+  # provider: "gemini" (free tier 1500 RPD) or "anthropic" (paid)
+  jp_translation_provider: gemini
+  # gemini-2.0-flash for the free tier; claude-haiku-4-5 if provider=anthropic
+  jp_translation_model: gemini-2.5-flash-lite
+
+  # Markets that intersect any of these tag slugs are dropped (sports/games
+  # dominate volume but aren't the macro/crypto/politics signal).
+  excluded_tag_slugs:
+    - sports
+    - nba
+    - nfl
+    - mlb
+    - nhl
+    - ufc
+    - soccer
+    - tennis
+    - boxing
+    - games
+
+  # Bucket label → list of tag slugs. First match wins per market.
+  category_map:
+    Crypto:
+      - crypto
+      - bitcoin
+      - ethereum
+      - solana
+      - crypto-prices
+    Macro:
+      - macro-graph
+      - macro-single
+      - macro-indicators
+      - interest-rates
+      - fed
+      - economy
+      - recession
+      - inflation
+    Politics:
+      - politics
+      - geopolitics
+      - elections
+      - trump
+
+  # Optional human-curated labels: { polymarket_event_slug: short_label }.
+  # Use to surface Japanese / shortened titles in the Discord embed and tweet.
+  display_aliases: {}
+  #   bitcoin-150k-by-june-30-2026: "BTC $150k by Jun30"
+  #   us-recession-2026: "US 2026年内リセッション"

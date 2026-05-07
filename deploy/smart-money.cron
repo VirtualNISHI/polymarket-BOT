@@ -1,0 +1,19 @@
+# Polymarket Smart Money — VPS cron
+#
+# Install with:
+#   crontab -l > /tmp/cron.bak  # backup existing
+#   crontab /path/to/this/file  # OR copy these lines into `crontab -e`
+#
+# Adjust the project path. The .venv must already exist (see README).
+
+PROJECT_DIR=/srv/polymarket-smart-money
+PYTHON=/srv/polymarket-smart-money/.venv/bin/python
+
+# Hourly tracker + convergence detector
+0 * * * * cd $PROJECT_DIR && $PYTHON scripts/run.py >> $PROJECT_DIR/data/run.log 2>&1
+
+# Weekly PnL refresh — Sunday 03:00 UTC
+0 3 * * 0 cd $PROJECT_DIR && $PYTHON scripts/refresh_pnl.py >> $PROJECT_DIR/data/refresh.log 2>&1
+
+# Monthly watchlist rebuild — 1st of month 04:01 UTC
+1 4 1 * * cd $PROJECT_DIR && $PYTHON scripts/build_watchlist.py >> $PROJECT_DIR/data/build.log 2>&1

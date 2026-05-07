@@ -1,0 +1,92 @@
+name: daily-snapshot
+
+# Posts a Polymarket daily-snapshot card to Discord and X 3× per day.
+# JST 00:00 / 08:00 / 16:00 — 8 hours apart, hitting the morning, working
+# hours, and evening windows. Cron is :05 to dodge the GH Actions top-of-hour
+# rush (the schedule trigger is best-effort and can drift 5–15 min under load).
+on:
+  schedule:
+    - cron: '5 15 * * *'  # 00:05 JST  (15:05 UTC, prev day)
+    - cron: '5 23 * * *'  # 08:05 JST  (23:05 UTC, prev day)
+    - cron: '5 7 * * *'   # 16:05 JST  (07:05 UTC, same day)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Skip Discord/X posts (preview only)'
+        type: boolean
+        default: false
+      no_x:
+        description: 'Skip X (Twitter) post only'
+        type: boolean
+        default: false
+      no_discord:
+        description: 'Skip Discord post only'
+        type: boolean
+        default: false
+
+# Share `bot-state` branch with the other workflows in this repo (hourly,
+# build-watchlist, refresh-pnl) — serialize so they don't clobber each other's
+# DB push.
+concurrency:
+  group: bot-state
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+
+      # Noto Sans CJK is needed for Japanese glyph rendering in the snapshot
+      # PNG. Pre-installed on ubuntu-latest? Not reliably — install it.
+      - name: Install Japanese font
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+
+      - name: Install
+        run: pip install -e .
+
+      - name: Restore state DB from bot-state branch
+        run: bash scripts/_ci_state.sh restore
+
+      - name: Build flag args
+        id: flags
+        run: |
+          ARGS=""
+          if [[ "${{ inputs.no_x }}" == "true" ]]; then ARGS="$ARGS --no-x"; fi
+          if [[ "${{ inputs.no_discord }}" == "true" ]]; then ARGS="$ARGS --no-discord"; fi
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then ARGS="$ARGS --dry-run"; fi
+          echo "args=$ARGS" >> "$GITHUB_OUTPUT"
+
+      - name: Run daily snapshot
+        env:
+          DAILY_SNAPSHOT_DISCORD_WEBHOOK_URL: ${{ secrets.DAILY_SNAPSHOT_DISCORD_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LOG_LEVEL: INFO
+          POLYMARKET_USER_AGENT: polymarket-smart-money/0.1 (+https://github.com/${{ github.repository }})
+        run: python scripts/run_daily.py ${{ steps.flags.outputs.args }}
+
+      - name: Persist state DB
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/_ci_state.sh save

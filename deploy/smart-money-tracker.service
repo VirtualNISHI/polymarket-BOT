@@ -1,0 +1,18 @@
+[Unit]
+Description=Polymarket Smart Money — hourly tracker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=smartmoney
+WorkingDirectory=/srv/polymarket-smart-money
+EnvironmentFile=/srv/polymarket-smart-money/.env
+ExecStart=/srv/polymarket-smart-money/.venv/bin/python scripts/run.py
+StandardOutput=append:/srv/polymarket-smart-money/data/run.log
+StandardError=append:/srv/polymarket-smart-money/data/run.log
+# Be polite to Polymarket's public API on retries.
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

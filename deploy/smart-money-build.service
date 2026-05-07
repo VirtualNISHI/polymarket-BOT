@@ -1,0 +1,17 @@
+[Unit]
+Description=Polymarket Smart Money — monthly watchlist rebuild
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=smartmoney
+WorkingDirectory=/srv/polymarket-smart-money
+EnvironmentFile=/srv/polymarket-smart-money/.env
+ExecStart=/srv/polymarket-smart-money/.venv/bin/python scripts/build_watchlist.py
+StandardOutput=append:/srv/polymarket-smart-money/data/build.log
+StandardError=append:/srv/polymarket-smart-money/data/build.log
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

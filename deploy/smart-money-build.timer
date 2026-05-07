@@ -1,0 +1,10 @@
+[Unit]
+Description=Run smart-money watchlist rebuild monthly
+
+[Timer]
+OnCalendar=*-*-01 04:01:00 UTC
+Persistent=true
+Unit=smart-money-build.service
+
+[Install]
+WantedBy=timers.target

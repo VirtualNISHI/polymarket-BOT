@@ -1,0 +1,12 @@
+[Unit]
+Description=Run smart-money-tracker hourly
+
+[Timer]
+OnCalendar=hourly
+# Spread load: don't fire exactly on the hour.
+RandomizedDelaySec=120
+Persistent=true
+Unit=smart-money-tracker.service
+
+[Install]
+WantedBy=timers.target

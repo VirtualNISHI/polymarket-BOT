@@ -1,0 +1,17 @@
+[Unit]
+Description=Polymarket Smart Money — weekly PnL refresh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=smartmoney
+WorkingDirectory=/srv/polymarket-smart-money
+EnvironmentFile=/srv/polymarket-smart-money/.env
+ExecStart=/srv/polymarket-smart-money/.venv/bin/python scripts/refresh_pnl.py
+StandardOutput=append:/srv/polymarket-smart-money/data/refresh.log
+StandardError=append:/srv/polymarket-smart-money/data/refresh.log
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

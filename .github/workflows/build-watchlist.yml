@@ -1,0 +1,55 @@
+name: build-watchlist
+
+on:
+  schedule:
+    # 04:01 UTC on the 1st of each month (after refresh-pnl's weekly Sunday slot)
+    - cron: '1 4 1 * *'
+  workflow_dispatch:
+
+concurrency:
+  group: bot-state
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+
+      - name: Install
+        run: pip install -e .
+
+      - name: Restore state DB from bot-state branch
+        run: bash scripts/_ci_state.sh restore
+
+      - name: Build watchlist
+        env:
+          LOG_LEVEL: INFO
+          POLYMARKET_USER_AGENT: polymarket-smart-money/0.1 (+https://github.com/${{ github.repository }})
+        run: python scripts/build_watchlist.py
+
+      - name: Persist state DB
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/_ci_state.sh save
+
+      - name: Upload watchlist summary as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: watchlist-${{ github.run_id }}
+          path: data/smart_money.db
+          retention-days: 30

@@ -1,0 +1,55 @@
+name: hourly-tracker
+
+on:
+  schedule:
+    # every hour at :05 (avoid the top-of-hour spike on GH Actions)
+    - cron: '5 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Skip Discord posts'
+        type: boolean
+        default: false
+
+# All three workflows in this repo share `bot-state` branch — serialize them.
+concurrency:
+  group: bot-state
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+
+      - name: Install
+        run: pip install -e .
+
+      - name: Restore state DB from bot-state branch
+        run: bash scripts/_ci_state.sh restore
+
+      - name: Run hourly job
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+          LOG_LEVEL: INFO
+          POLYMARKET_USER_AGENT: polymarket-smart-money/0.1 (+https://github.com/${{ github.repository }})
+        run: python scripts/run.py
+
+      - name: Persist state DB
+        if: always()  # save even if job partially failed, to keep poll_state moving
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/_ci_state.sh save

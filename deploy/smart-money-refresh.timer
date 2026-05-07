@@ -1,0 +1,10 @@
+[Unit]
+Description=Run smart-money PnL refresh weekly
+
+[Timer]
+OnCalendar=Sun *-*-* 03:00:00 UTC
+Persistent=true
+Unit=smart-money-refresh.service
+
+[Install]
+WantedBy=timers.target
