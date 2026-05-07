@@ -3,6 +3,8 @@
 Polymarket で一貫して勝っている「常勝ウォレット」の新規ポジションを追跡し Discord に通知するボット。
 仮想NISHI 配信の **Phase 2**。Whale Alerts(Phase 1)が安定稼働してから着手。
 
+> **Building a similar bot for another market?** See [TEMPLATE.md](TEMPLATE.md) — the daily-snapshot stack (Discord+X poster, image card renderer, Gemini-backed Japanese label translator, GitHub Actions cron) is reusable; only the data-collection layer is domain-specific.
+
 ## このプロジェクトの目的
 
 - Polymarket のスマートマネー(常勝ウォレット 20–50件)をウォッチリスト化
