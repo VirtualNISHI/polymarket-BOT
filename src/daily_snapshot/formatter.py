@@ -27,7 +27,7 @@ def _label(row: SnapshotRow, aliases: dict[str, str], max_chars: int = 40) -> st
 def _fmt_pct(p: float | None) -> str:
     if p is None:
         return "—"
-    return f"{p * 100:.0f}%"
+    return f"{p * 100:.1f}%"
 
 
 def _fmt_delta_pp(d: float | None) -> str:

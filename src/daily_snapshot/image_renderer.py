@@ -80,9 +80,11 @@ def _load_font(candidates: list[tuple[str, int]], size: int) -> ImageFont.FreeTy
 
 
 def _fmt_pct(p: float | None) -> str:
+    """Format YES price as percentage with one decimal — matches the
+    delta column's precision so the eye reads the two columns as a pair."""
     if p is None:
         return "—"
-    return f"{p * 100:.0f}%"
+    return f"{p * 100:.1f}%"
 
 
 def _fmt_delta_pp(d: float | None) -> tuple[str, tuple[int, int, int]]:
