@@ -39,9 +39,9 @@ refresh_pnl:
 daily_snapshot:
   fetch_limit: 200
   min_volume_24h_usd: 50000
-  movers_count: 3
-  crypto_count: 3
-  macro_count: 3
+  movers_count: 5
+  crypto_count: 5
+  macro_count: 5
   politics_count: 0
   label_max_chars: 40
   discord_color: 0x9b59b6

@@ -33,9 +33,11 @@ from .collector import SnapshotRow
 
 log = logging.getLogger(__name__)
 
-# Canvas — sized so 3 sections × 3 rows + header + footer pack tightly without
-# trailing whitespace. Bumps to 800h if a 4th (politics) section is rendered.
-W, H = 1200, 720
+# Canvas — sized for 3 sections × 5 rows + header + footer at 32px row pitch.
+#   header (130) + 3 × (title 42 + 5 rows × 32 + gap 18 = 220) + footer (50)
+#   = 130 + 660 + 50 = 840 — 60px buffer at H=900 keeps the footer comfortable.
+# Drop H to 720 if reverting to 3 rows/section.
+W, H = 1200, 900
 PAD = 50
 
 # Dark palette
