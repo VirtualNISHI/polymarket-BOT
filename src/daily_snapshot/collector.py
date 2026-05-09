@@ -9,11 +9,28 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Iterable
 
 from ..polymarket_client import PolymarketClient
 
 log = logging.getLogger(__name__)
+
+
+def _days_to(end_date: str | None, *, now: datetime | None = None) -> float | None:
+    """Days from ``now`` to an ISO-8601 ``end_date``. Returns None on bad data."""
+    if not end_date:
+        return None
+    now = now or datetime.now(tz=timezone.utc)
+    try:
+        # Polymarket emits "...Z"; fromisoformat() needs "+00:00" pre-3.11.
+        s = end_date.replace("Z", "+00:00")
+        end = datetime.fromisoformat(s)
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return None
+    return (end - now).total_seconds() / 86400.0
 
 
 @dataclass
@@ -50,34 +67,57 @@ def collect_snapshot(
     *,
     fetch_limit: int = 200,
     min_volume_24h_usd: float = 50_000,
+    min_days_to_resolution: int = 14,
+    min_yes_price: float = 0.03,
+    max_yes_price: float = 0.97,
     category_map: dict[str, list[str]],
     excluded_tag_slugs: Iterable[str] = (),
 ) -> list[SnapshotRow]:
     """Fetch the universe of active markets and return categorized rows.
 
-    Filtering:
-    - Drops markets with ``volume_24h_usd < min_volume_24h_usd`` (kills the
-      illiquid long tail where ``oneDayPriceChange`` is noisy or None).
-    - Drops markets whose tag set intersects ``excluded_tag_slugs`` (default
-      use: drop sports / live games which dominate volume but aren't the
-      macro/crypto/politics signal we want).
+    Filtering pipeline:
+    - ``volume_24h_usd >= min_volume_24h_usd`` — kills the illiquid long tail
+      where ``oneDayPriceChange`` is noisy or None.
+    - Tag exclusion (``excluded_tag_slugs``) — drops sports / games / etc.
+    - ``min_days_to_resolution`` — drops daily/weekly price-tier ladders
+      ("BTC above $X on May 7?") and short-window novelty markets that
+      otherwise dominate Top movers / Crypto sections with ephemeral noise.
+    - Probability deadband (``min_yes_price`` / ``max_yes_price``) — drops
+      already-determined (>97%) and tail (<3%) markets where the 24h Δ is
+      noise on a near-flat curve.
     - Drops markets where ``yes_price`` is None (malformed entries).
 
     Rows that don't match any bucket get ``category=None`` so the formatter
     can still use them for the cross-category "Top movers" section.
+
+    Set any threshold to 0 (or 1.0 for ``max_yes_price``) to disable that
+    filter.
     """
     raw = client.active_markets_with_tags(
         limit=fetch_limit, order="volume24hr", ascending=False
     )
     excluded = {s.lower() for s in excluded_tag_slugs}
+    now = datetime.now(tz=timezone.utc)
 
     rows: list[SnapshotRow] = []
+    drop_counts = {"yes_price": 0, "volume": 0, "tag": 0, "ttl": 0, "bounds": 0}
     for m in raw:
         if m["yes_price"] is None:
+            drop_counts["yes_price"] += 1
             continue
         if m["volume_24h_usd"] < min_volume_24h_usd:
+            drop_counts["volume"] += 1
             continue
         if any(s in excluded for s in m["tag_slugs"]):
+            drop_counts["tag"] += 1
+            continue
+        if min_days_to_resolution > 0:
+            ttl = _days_to(m.get("end_date"), now=now)
+            if ttl is not None and ttl < min_days_to_resolution:
+                drop_counts["ttl"] += 1
+                continue
+        if not (min_yes_price <= m["yes_price"] <= max_yes_price):
+            drop_counts["bounds"] += 1
             continue
         rows.append(
             SnapshotRow(
@@ -95,9 +135,8 @@ def collect_snapshot(
         )
 
     log.info(
-        "snapshot universe: %d markets after filtering (from %d raw)",
-        len(rows),
-        len(raw),
+        "snapshot universe: %d markets after filtering (from %d raw); drops: %s",
+        len(rows), len(raw), drop_counts,
     )
     return rows
 

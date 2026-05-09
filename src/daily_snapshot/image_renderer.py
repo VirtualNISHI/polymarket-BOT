@@ -33,12 +33,20 @@ from .collector import SnapshotRow
 
 log = logging.getLogger(__name__)
 
-# Canvas — sized for 3 sections × 5 rows + header + footer at 32px row pitch.
-#   header (130) + 3 × (title 42 + 5 rows × 32 + gap 18 = 220) + footer (50)
-#   = 130 + 660 + 50 = 840 — 60px buffer at H=900 keeps the footer comfortable.
-# Drop H to 720 if reverting to 3 rows/section.
-W, H = 1200, 900
+# Canvas width is fixed; height is computed from the actual section/row
+# counts so daily variability in available markets doesn't leave a big
+# whitespace band at the bottom. A typical 3 × 5 build is ~880h; a sparse
+# 3 × 3 build is ~660h.
+W = 1200
 PAD = 50
+
+# Vertical layout constants used for both sizing and rendering — keep these
+# in sync if you tweak fonts.
+HEADER_BOTTOM = 130       # title + date + divider line
+FOOTER_BAND = 80          # divider + footer text + bottom margin
+SECTION_TITLE_H = 42      # emoji + title row
+ROW_H = 32                # one bullet row
+SECTION_GAP = 18          # gap after each section's last row
 
 # Dark palette
 BG = (14, 16, 20)              # #0e1014
@@ -106,6 +114,15 @@ def _label(row: SnapshotRow, aliases: dict[str, str], max_chars: int = 28) -> st
     return q if len(q) <= max_chars else q[: max_chars - 1].rstrip() + "…"
 
 
+def _compute_height(section_row_counts: list[int]) -> int:
+    """Total canvas height needed for the given per-section row counts."""
+    if not section_row_counts:
+        return HEADER_BOTTOM + FOOTER_BAND + 60
+    body = sum(SECTION_TITLE_H + n * ROW_H + SECTION_GAP for n in section_row_counts)
+    body -= SECTION_GAP  # trailing gap after the last section is excess
+    return HEADER_BOTTOM + body + FOOTER_BAND
+
+
 def render_snapshot_png(
     *,
     snapshot_date: datetime,
@@ -116,6 +133,11 @@ def render_snapshot_png(
     aliases: dict[str, str],
 ) -> bytes:
     """Render the snapshot to PNG bytes."""
+    section_counts = [len(movers), len(crypto), len(macro)]
+    if politics:
+        section_counts.append(len(politics))
+    H = _compute_height(section_counts)
+
     img = Image.new("RGB", (W, H), BG)
     draw = ImageDraw.Draw(img)
 
@@ -159,8 +181,8 @@ def render_snapshot_png(
         if politics:
             sections.append(("🗳", "Politics", politics))
 
-        # Each section: emoji+title + 3 rows. Tight vertical packing.
-        section_h = 165  # title (40) + 3 rows × ~35 + gap
+        # Each section: emoji+title + N rows. Vertical positions follow the
+        # SECTION_TITLE_H / ROW_H / SECTION_GAP constants used by _compute_height.
         y = 160
 
         for emoji, title, rows in sections:

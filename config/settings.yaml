@@ -39,6 +39,13 @@ refresh_pnl:
 daily_snapshot:
   fetch_limit: 200
   min_volume_24h_usd: 50000
+
+  # Quality filters — see collector.collect_snapshot docstring for rationale.
+  # Set to 0 (or 1.0 for max_yes_price) to disable individually.
+  min_days_to_resolution: 14    # drops daily/weekly price-tier ladders
+  min_yes_price: 0.01           # drops sub-1% tail markets (loose: keeps real long shots like FOMC ±50bps)
+  max_yes_price: 0.99           # drops >99% already-determined markets (loose: keeps near-certain politics)
+
   movers_count: 5
   crypto_count: 5
   macro_count: 5
@@ -76,6 +83,8 @@ daily_snapshot:
     - games
 
   # Bucket label → list of tag slugs. First match wins per market.
+  # Order matters: a market with both `oil` and `politics` tags lands in
+  # whichever bucket comes first below (Macro for `oil`).
   category_map:
     Crypto:
       - crypto
@@ -92,6 +101,14 @@ daily_snapshot:
       - economy
       - recession
       - inflation
+      - oil
+      - commodities
+      - stocks
+      - earnings
+      - jobs
+      - cpi
+      - gdp
+      - housing
     Politics:
       - politics
       - geopolitics

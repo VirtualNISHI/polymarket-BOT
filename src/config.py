@@ -59,6 +59,15 @@ class RefreshPnlConfig:
 class DailySnapshotConfig:
     fetch_limit: int = 200
     min_volume_24h_usd: float = 50_000
+    # Quality filters (Phase 1: A + B from the noise-reduction analysis):
+    #  - min_days_to_resolution drops daily/weekly resolution markets which
+    #    create extreme but ephemeral price moves (e.g. "BTC above $X on May 7")
+    #    that flood the Crypto section with price-tier ladders.
+    #  - min/max_yes_price drops already-determined (>97%) and tail (<3%)
+    #    markets where the Δ is noise rather than informative.
+    min_days_to_resolution: int = 14
+    min_yes_price: float = 0.01
+    max_yes_price: float = 0.99
     movers_count: int = 3
     crypto_count: int = 3
     macro_count: int = 3
@@ -170,6 +179,11 @@ def _yaml_to_dataclasses(raw: dict[str, Any]) -> tuple[
     ds = DailySnapshotConfig(
         fetch_limit=ds_raw.get("fetch_limit", ds_default.fetch_limit),
         min_volume_24h_usd=ds_raw.get("min_volume_24h_usd", ds_default.min_volume_24h_usd),
+        min_days_to_resolution=ds_raw.get(
+            "min_days_to_resolution", ds_default.min_days_to_resolution
+        ),
+        min_yes_price=ds_raw.get("min_yes_price", ds_default.min_yes_price),
+        max_yes_price=ds_raw.get("max_yes_price", ds_default.max_yes_price),
         movers_count=ds_raw.get("movers_count", ds_default.movers_count),
         crypto_count=ds_raw.get("crypto_count", ds_default.crypto_count),
         macro_count=ds_raw.get("macro_count", ds_default.macro_count),

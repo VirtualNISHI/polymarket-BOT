@@ -81,6 +81,9 @@ def run(settings: Settings | None = None, *, ensure_schema: bool = True) -> None
             poly,
             fetch_limit=cfg.fetch_limit,
             min_volume_24h_usd=cfg.min_volume_24h_usd,
+            min_days_to_resolution=cfg.min_days_to_resolution,
+            min_yes_price=cfg.min_yes_price,
+            max_yes_price=cfg.max_yes_price,
             category_map=cfg.category_map,
             excluded_tag_slugs=cfg.excluded_tag_slugs,
         )
