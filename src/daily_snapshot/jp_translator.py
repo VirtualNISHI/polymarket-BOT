@@ -197,9 +197,52 @@ def _call_gemini(
     return out
 
 
+def _call_deepl(
+    api_key: str, model: str, items: list[tuple[str, str]]
+) -> dict[str, str]:
+    """Plain English→Japanese translation via DeepL Free as a fallback when
+    the primary LLM provider is rate-limited or unavailable. Output won't have
+    the stylized qualifiers the LLM produces, but plain translation beats
+    English truncation. ``model`` is unused (interface consistency only).
+    """
+    if not items or not api_key:
+        return {}
+    try:
+        import requests
+    except ImportError:
+        log.warning("requests not installed; skipping DeepL fallback")
+        return {}
+
+    questions = [q for _, q in items]
+    try:
+        r = requests.post(
+            "https://api-free.deepl.com/v2/translate",
+            headers={"Authorization": f"DeepL-Auth-Key {api_key}"},
+            data=[("text", q) for q in questions] + [
+                ("target_lang", "JA"),
+                ("source_lang", "EN"),
+            ],
+            timeout=20,
+        )
+        r.raise_for_status()
+        translations = [t["text"].strip() for t in r.json()["translations"]]
+    except Exception as exc:
+        log.warning("deepl translate batch failed: %s", exc)
+        return {}
+
+    out = {
+        slug: label
+        for (slug, _), label in zip(items, translations)
+        if slug and label
+    }
+    log.info("deepl translated %d/%d items (fallback)", len(out), len(items))
+    return out
+
+
 _PROVIDER_DISPATCH = {
     "anthropic": _call_claude,
     "gemini": _call_gemini,
+    "deepl": _call_deepl,
 }
 
 
@@ -212,6 +255,7 @@ def build_label_map(
     provider: str = "gemini",
     model: str = "gemini-2.0-flash",
     enable_translation: bool = True,
+    deepl_api_key: str = "",
 ) -> dict[str, str]:
     """Build slug → JP-label dict for the formatter.
 
@@ -219,6 +263,9 @@ def build_label_map(
     1. ``manual_aliases`` (operator-curated, always wins)
     2. SQLite cache lookup
     3. Fresh API call to ``provider`` ("gemini" or "anthropic")
+    4. ``deepl_api_key`` if set: DeepL plain translation for any slug
+       the primary provider couldn't fill (quota/timeout/error). Plain
+       translation lacks the stylized qualifiers but is readable.
     """
     label_map: dict[str, str] = dict(manual_aliases)
 
@@ -236,21 +283,24 @@ def build_label_map(
 
     if not enable_translation:
         return label_map
-    if not api_key:
-        log.info("%s api key not set; skipping JP translation for %d misses",
-                 provider, len(miss_rows))
-        return label_map
-
-    call = _PROVIDER_DISPATCH.get(provider)
-    if call is None:
-        log.warning("unknown jp_translation_provider=%r; valid: %s",
-                    provider, list(_PROVIDER_DISPATCH))
-        return label_map
 
     items = [(r.slug, r.question) for r in miss_rows if r.slug and r.question]
-    fresh = call(api_key, model, items)
+    question_by_slug = {r.slug: r.question for r in miss_rows if r.slug}
+
+    # ---- primary provider ----
+    fresh: dict[str, str] = {}
+    if api_key:
+        call = _PROVIDER_DISPATCH.get(provider)
+        if call is None:
+            log.warning("unknown jp_translation_provider=%r; valid: %s",
+                        provider, list(_PROVIDER_DISPATCH))
+        else:
+            fresh = call(api_key, model, items)
+    else:
+        log.info("%s api key not set; skipping primary translation for %d misses",
+                 provider, len(miss_rows))
+
     if fresh:
-        question_by_slug = {r.slug: r.question for r in miss_rows if r.slug}
         _write_cache(
             conn,
             [
@@ -259,5 +309,21 @@ def build_label_map(
             ],
         )
         label_map.update(fresh)
+
+    # ---- DeepL fallback for anything the primary missed ----
+    if deepl_api_key:
+        unfilled = [(s, q) for s, q in items if s not in fresh]
+        if unfilled:
+            deepl_fresh = _call_deepl(deepl_api_key, "", unfilled)
+            if deepl_fresh:
+                _write_cache(
+                    conn,
+                    [
+                        (slug, label, "deepl",
+                         question_by_slug.get(slug, ""))
+                        for slug, label in deepl_fresh.items()
+                    ],
+                )
+                label_map.update(deepl_fresh)
 
     return label_map

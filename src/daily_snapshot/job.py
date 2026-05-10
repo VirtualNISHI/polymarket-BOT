@@ -118,6 +118,7 @@ def run(settings: Settings | None = None, *, ensure_schema: bool = True) -> None
             provider=cfg.jp_translation_provider,
             model=cfg.jp_translation_model,
             enable_translation=cfg.enable_jp_translation,
+            deepl_api_key=settings.deepl_api_key,
         )
     finally:
         conn_for_labels.close()

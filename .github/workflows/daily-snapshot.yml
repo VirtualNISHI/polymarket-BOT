@@ -81,6 +81,7 @@ jobs:
           X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
           LOG_LEVEL: INFO
           POLYMARKET_USER_AGENT: polymarket-smart-money/0.1 (+https://github.com/${{ github.repository }})
         run: python scripts/run_daily.py ${{ steps.flags.outputs.args }}
