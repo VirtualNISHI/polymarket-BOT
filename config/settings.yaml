@@ -52,7 +52,7 @@ daily_snapshot:
   politics_count: 0
   label_max_chars: 40
   discord_color: 0x9b59b6
-  enable_discord: true
+  enable_discord: false   # Discord posting disabled — X-only mode
   enable_x: true
 
   # Render a 1200x720 PNG card and attach to Discord/X (text replaced with
